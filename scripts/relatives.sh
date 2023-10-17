@@ -15,24 +15,30 @@ hs37d5_path="hs37d5_fasta_path" #provide the path of hs37d5.fa reference genome
 HapMapChrX_path="HapMapChrX.gz_path" #provide the path of HapMapChrX.gz (see STEP_05 for details)
 5M="Koptekin.5M.auto_path" #provide the path of Koptekin.5M.auto files (snp, pos, bed) are located (see STEP_09 for details)
 1240K="1240K_path" #provide the path of 1240K files (snp, pos, bed) are located (see STEP_10 for details)
+OUTPUT_FOLDER="path_to_output_folder" #Please provide name of the output folder
 
 ###STEP_01
 ###This script creates the sample/library IDs for post-mapache analyses.
 ###Requires a list of sample_level_IDs (sample_IDs_mapache.txt; one name per line) located in mapache/post_analyses (directory post_analyses should be manually made)
 ###Check the lists to remove potential duplicates.
+MAPACHE_DIR="mapache/post_analyses" # Specify MAPACHE output direcotry
 
 cd mapache/post_analyses
-tail -n +2 ../config/samples_$dataset.tsv | awk 'BEGIN{FS=" "} {printf $1 "\n"}' > sample_IDs_mapache_temp.txt
-sort -u sample_IDs_mapache_temp.txt > sample_IDs_mapache.txt
-rm sample_IDs_mapache_temp.txt
-for sample_level_ID in $(< sample_IDs_mapache.txt); do
-  grep "$sample_level_ID" ../config/samples_$dataset.tsv | awk 'BEGIN{FS=" "} {printf $2 "\n"}' >> $sample_level_ID.library_IDs_mapache_temp.txt
-  sort -u $sample_level_ID.library_IDs_mapache_temp.txt > $sample_level_ID.library_IDs_mapache.txt
-  rm $sample_level_ID.library_IDs_mapache_temp.txt
-  grep "$sample_level_ID" ../config/samples_$dataset.tsv |grep ",DS_"| awk 'BEGIN{FS=" "} {printf $2 "\n"}' >> $sample_level_ID.library_IDs_mapache_DS_temp.txt ### This requires providing the "DS" group tag in mapache samplelist file.
-  sort -u $sample_level_ID.library_IDs_mapache_DS_temp.txt > $sample_level_ID.library_IDs_mapache_DS.txt
-  rm $sample_level_ID.library_IDs_mapache_DS_temp.txt  
-  done
+tail -n +2 $MAPACHE_DIR"/../config/samples_"$dataset".tsv" | awk 'BEGIN{FS=" "} {printf $1 "\n"}' > $OUTPUT_FOLDER"/sample_IDs_mapache_temp.txt"
+sort -u $OUTPUT_FOLDER"/sample_IDs_mapache_temp.txt" > $OUTPUT_FOLDER"/sample_IDs_mapache.txt"
+rm $OUTPUT_FOLDER"/sample_IDs_mapache_temp.txt"
+
+for sample_level_ID in $(< $MAPACHE_DIR"/sample_IDs_mapache.txt"); do
+    grep $MAPACHE_DIR"/"$sample_level_ID" ../config/samples_"$dataset.tsv | awk 'BEGIN{FS=" "} {printf $2 "\n"}' >> $OUTPUT_FOLDER"/"$sample_level_ID".library_IDs_mapache_temp.txt"
+    sort -u $OUTPUT_FOLDER"/"$sample_level_ID".library_IDs_mapache_temp.txt" > $OUTPUT_FOLDER"/"$sample_level_ID".library_IDs_mapache.txt"
+    rm $OUTPUT_FOLDER"/"$sample_level_ID.library_IDs_mapache_temp.txt 
+    grep "$sample_level_ID" $MAPACHE_DIR"/../config/samples_"$dataset.tsv | "grep ,DS_"| awk 'BEGIN{FS=" "} {printf $2 "\n"}' >> $OUTPUT_FOLDER"/"$sample_level_ID".library_IDs_mapache_DS_temp.txt" ### This requires providing the "DS" group tag in mapache samplelist file.
+    sort -u $OUTPUT_FOLDER"/"$sample_level_ID".library_IDs_mapache_DS_temp.txt" > $OUTPUT_FOLDER"/"$sample_level_ID".library_IDs_mapache_DS.txt"
+    rm $OUTPUT_FOLDER"/"$sample_level_ID".library_IDs_mapache_DS_temp.txt"
+done
+
+
+
 echo "!!! Important: For downstream analyses please manually make the ${population}_IDs_READ.txt, ${population}_IDs_KIN.txt and sample_IDs_mapache_males.txt files" 
 
 ###STEP_02
@@ -42,17 +48,22 @@ echo "!!! Important: For downstream analyses please manually make the ${populati
 ###It requires the conda environment of mapache installed
 
 echo "!!!Program starts: Genetic sex inference with Ry method!!!"
-mkdir 00_2_genetic_sex_Ry
-cd 00_2_genetic_sex_Ry
-conda activate mapache
-for sample_level_ID in $(< ../sample_IDs_mapache.txt); do  
-  mkdir $sample_level_ID
-  cd $sample_level_ID
-  echo "using sample" $sample_level_ID
-  samtools view -q 30 ../../../results_$dataset/03_sample/03_final_sample/01_bam/$sample_level_ID.hs37d5.bam | python2 ~/software/Ry_compute/ry_compute.py > $sample_level_ID.Ry.txt
-  echo "complete"
-  cd ../
-  done
+
+RY_Analysis_folder=$OUTPUT_FOLDER"/00_2_genetic_sex_Ry"
+if ! [ -d $RY_Analysis_folder ]; then
+    mkdir -p $RY_Analysis_folder
+fi
+# mkdir 00_2_genetic_sex_Ry
+# cd 00_2_genetic_sex_Ry
+conda activate mapache ## Why is there a conda activate?
+for sample_level_ID in $(< $MAPACHE_DIR"/sample_IDs_mapache.txt"); do
+    mkdir $RY_Analysis_folder"/"$sample_level_ID
+    cd $sample_level_ID
+    echo "using sample" $sample_level_ID
+    samtools view -q 30 "../../../results_"$dataset"/03_sample/03_final_sample/01_bam/"$sample_level_ID".hs37d5.bam" | python2 ~/software/Ry_compute/ry_compute.py > $sample_level_ID.Ry.txt
+    echo "complete"
+    cd ../
+done
 conda deactivate
 echo "!!!End of program: Genetic sex inference with Ry method!!!"
 
